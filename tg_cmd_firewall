@@ -1,0 +1,177 @@
+:local send [:parse [/system script get tg_sendMessage source]]
+:local param1 [:pick $params 0 [:find $params " "]]
+:local restParams [:pick $params ([:find $params " "]+1) [:len $params]]
+/log info ("para ".$restParams)
+
+:if ($param1="show") do={
+    :local ipAddrs [:toarray ""]
+    :local dstPorts [:toarray ""]
+    :local layer7s [:toarray ""]
+    :local numbers [:toarray ""]
+
+    :foreach i in=[/ip firewall filter find] do={
+        :set numbers ($numbers, $i)
+        :set ipAddrs ($ipAddrs, [/ip firewall filter get $i src-address])
+        :set dstPorts ($dstPorts, [/ip firewall filter get $i dst-port])
+        :set layer7s ($layer7s, [/ip firewall filter get $i layer7-protocol])
+    }
+
+    /log info ("Numbers: " . [:tostr $numbers])
+    /log info ("IP Addresses: " . [:tostr $ipAddrs])
+    /log info ("Destination Ports: " . [:tostr $dstPorts])
+    /log info ("Layer 7 Protocols: " . [:tostr $layer7s])
+
+    :local text "LIST FIREWALL FILTER :"
+    :local count [:len $numbers]
+
+    :if ($count = 0) do={
+        :set text ($text . "%0ATidak ada aturan firewall filter.")
+    } else={
+        :for i from=0 to=($count - 1) do={
+            :local number [:pick $numbers $i]
+            :local ipAddr [:pick $ipAddrs $i]
+            :local dstPort [:pick $dstPorts $i]
+            :local layer7 [:pick $layer7s $i]
+            
+            :local line ("%0A" . $number . "*. SRC Address : " . $ipAddr . " - Dst.Port : " . $dstPort . " - Layer 7 : " . $layer7)
+            :set text ($text . $line)
+            /log info ("Line " . $i . ": " . $line)
+        }
+    }
+
+    /log info ("Final text: " . $text)
+
+    
+    $send chat=$chatid text=("LIST FIREWALL FILTER : $text") mode="markdown"
+}
+
+
+:if ($param1="rem") do={
+    :local numberRule $restParams
+    
+    :if ([:len $numberRule] > 0) do={
+        /ip firewall filter remove numbers="*$numberRule"
+        :local output "Berhasil menghapus firewall filter dengan no urut $numberRule"
+        $send chat=$chatid text=("$output") mode="markdown"
+    } else={
+        :local output "Pastikan memasukan nomor urut firewall filternya!"
+        $send chat=$chatid text=("$output") mode="markdown"
+    }
+}
+
+
+
+
+:if ($param1="add") do={
+    :local srcAddr ""
+    :local dstPort ""
+    :local protocol ""
+    :local dstAddrList ""
+    :local layer7 ""
+
+    # Inisialisasi array kosong
+    :local resultArray [:toarray ""]
+
+    # Fungsi untuk memisahkan string
+    :local splitString do={
+        :local str $1
+        :local result [:toarray ""]
+        :local currentPair ""
+        
+        :for i from=0 to=([:len $str] - 1) do={
+            :local char [:pick $str $i]
+            :if ($char != " ") do={
+                :set currentPair ($currentPair . $char)
+            } else={
+                :if ([:len $currentPair] > 0) do={
+                    :set result ($result, $currentPair)
+                    :set currentPair ""
+                }
+            }
+        }
+        
+        # Tambahkan pasangan terakhir jika ada
+        :if ([:len $currentPair] > 0) do={
+            :set result ($result, $currentPair)
+        }
+        
+        :return $result
+    }
+
+    # Panggil fungsi untuk memisahkan string
+    :set resultArray [$splitString $restParams]
+
+    # Tampilkan hasil
+    :foreach pair in=$resultArray do={
+        :local equalPos [:find $pair "="]
+        :if ($equalPos > 0) do={
+            :local key [:pick $pair 0 $equalPos]
+            :local value [:pick $pair ($equalPos + 1) [:len $pair]]
+            /log info ("value ".$key."adalah ". $value)
+
+            :if ($key = "src-addr") do={
+                :set srcAddr $value
+            } 
+            :if ($key = "port") do={
+                :set dstPort $value
+            } 
+            :if ($key = "protokol") do={
+                :set protocol $value
+            }
+            :if ($key = "dst-addr-list") do={
+                /log info ("Masook: " . $value)
+                :set dstAddrList $value
+            } 
+            :if ($key = "layer7") do={
+                :set layer7 $value
+            }
+            
+        }
+    }
+
+    /log info ("srcAddr: " . $srcAddr)
+    /log info ("srcAddr: " . $dstPort)
+    /log info ("srcAddr: " . $protocol)
+    /log info ("srcAddr: " . $dstAddrList)
+    /log info ("srcAddr: " . $layer7)
+
+    :if ([:len $srcAddr] = 0) do={
+        :local output "Pastikan untuk memasukkan src-addr. Contoh: /firewall src-addr=<ip> port=<port> protokol=<protocol> dst-addr-list=<list> layer7=<layer7> "
+        $send chat=$chatid text=("$output") mode="markdown"
+        /log error "src-addr tidak ditemukan. Menghentikan script."
+        :error "src-addr tidak ditemukan. Menghentikan script."
+    }
+
+    :local output "Memproses aturan firewall dengan src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 "
+    $send chat=$chatid text=("$output") mode="markdown"
+
+
+    :if ([:len $layer7] > 0) do={
+        /log info "Memeriksa Layer7 Protocol..."
+        :local layer7Id [ip firewall layer7-protocol print count-only where name=$layer7]
+        /log info ("layer7Id: " . $layer7Id)
+        :if ($layer7Id = 0) do={
+            :local output "Layer7 Protocol $layer7 tidak ditemukan."
+            $send chat=$chatid text=("$output") mode="markdown"
+            :error "Layer7 Protocol $layer7 tidak ditemukan."
+        }
+    }
+
+    :if ([:len $dstAddrList] > 0) do={
+        /log info "Memeriksa dstAddrList..."
+        :local dstCheckin [ip firewall address-list print count-only where list=$dstAddrList]
+        /log info ("dstCheckin: " . $dstCheckin)
+        :if ($dstCheckin = 0) do={
+            :local output "Daftar alamat tujuan ($dstAddrList) tidak ditemukan."
+            $send chat=$chatid text=("$output") mode="markdown"
+            :error "Daftar alamat tujuan ($dstAddrList) tidak ditemukan."
+        }
+    }
+
+    /log info "Menambah aturan firewall..."
+    /ip firewall filter add chain=forward src-address=$srcAddr dst-port=$dstPort protocol=$protocol dst-address-list=$dstAddrList layer7-protocol=$layer7 action=drop
+    :local output "Aturan firewall telah ditambahkan: src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 "
+    $send chat=$chatid text=("$output") mode="markdown"
+
+    /log info "Script selesai."
+}
