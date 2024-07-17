@@ -68,6 +68,7 @@
     :local protocol ""
     :local dstAddrList ""
     :local layer7 ""
+    :local content ""
 
     # Inisialisasi array kosong
     :local resultArray [:toarray ""]
@@ -125,24 +126,27 @@
             :if ($key = "layer7") do={
                 :set layer7 $value
             }
-            
+            :if ($key = "content") do={
+                :set content $value
+            }
         }
     }
 
     /log info ("srcAddr: " . $srcAddr)
-    /log info ("srcAddr: " . $dstPort)
-    /log info ("srcAddr: " . $protocol)
-    /log info ("srcAddr: " . $dstAddrList)
-    /log info ("srcAddr: " . $layer7)
+    /log info ("dstport: " . $dstPort)
+    /log info ("protocol: " . $protocol)
+    /log info ("dstaddrlist: " . $dstAddrList)
+    /log info ("layer7: " . $layer7)
+    /log info ("content: " . $content)
 
     :if ([:len $srcAddr] = 0) do={
-        :local output "Pastikan untuk memasukkan src-addr. Contoh: /firewall src-addr=<ip> port=<port> protokol=<protocol> dst-addr-list=<list> layer7=<layer7> "
+        :local output "Pastikan untuk memasukkan src-addr. Contoh: /firewall src-addr=<ip> port=<port> protokol=<protocol> dst-addr-list=<list> layer7=<layer7> content=<content>"
         $send chat=$chatid text=("$output") mode="markdown"
         /log error "src-addr tidak ditemukan. Menghentikan script."
         :error "src-addr tidak ditemukan. Menghentikan script."
     }
 
-    :local output "Memproses aturan firewall dengan src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 "
+    :local output "Memproses aturan firewall dengan src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 content=$content"
     $send chat=$chatid text=("$output") mode="markdown"
 
 
@@ -169,8 +173,8 @@
     }
 
     /log info "Menambah aturan firewall..."
-    /ip firewall filter add chain=forward src-address=$srcAddr dst-port=$dstPort protocol=$protocol dst-address-list=$dstAddrList layer7-protocol=$layer7 action=drop
-    :local output "Aturan firewall telah ditambahkan: src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 "
+    /ip firewall filter add chain=forward src-address=$srcAddr dst-port=$dstPort protocol=$protocol dst-address-list=$dstAddrList layer7-protocol=$layer7 action=drop content=$content
+    :local output "Aturan firewall telah ditambahkan: src-addr=$srcAddr dst-port=$dstPort protokol=$protocol dst-addr-list=$dstAddrList layer7=$layer7 content=$content"
     $send chat=$chatid text=("$output") mode="markdown"
 
     /log info "Script selesai."
